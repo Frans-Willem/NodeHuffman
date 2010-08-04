@@ -71,51 +71,42 @@ PQ.prototype.remove=function(node) {
 PQ.prototype.top=function() {
 	return (this.len>0)?this.heap[0]:undefined;
 }
-
-function isNumeric(n) {
-	return Math.floor(n)==n;
-}
-
 function HuffmanTree() {
-	this._paths={};
 	this._nextId=0;
 	this._objNYT={stub:"NYT"};
 	this._objEnd={stub:"END"};
 	this._nodeChar={};
 	this._blocks={};
 	this._blocks[0]=new PQ();
-	if (true) {
-		this._root={
-			id: this._nextId++,
-			data: [],
-			weight: 0
-		};
-		this._root.parent=this._root;
-		this._nodeNYT=this._root.data[0]={
-			id: this._nextId++,
-			data: this._objNYT,
-			weight: 0,
-			parent: this._root
-		};
-		this._nodeEnd=this._root.data[1]={
-			id: this._nextId++,
-			data: this._objEnd,
-			weight: 0,
-			parent: this._root
-		};
-		this._blocks[0].insert(this._root);
-		this._blocks[0].insert(this._nodeNYT);
-		this._blocks[0].insert(this._nodeEnd);
-	} else {
-		this._root=this._nodeNYT={
-			id: this._nextId++,
-			data: this._objNYT,
-			weight: 0
-		};
-		this._root.parent=this._root;
-		this._blocks[0].insert(this._root);
-	}
+	this._root={
+		id: this._nextId++,
+		data: [],
+		weight: 0
+	};
+	this._root.parent=this._root;
+	this._nodeNYT=this._root.data[0]={
+		id: this._nextId++,
+		data: this._objNYT,
+		weight: 0,
+		parent: this._root
+	};
+	this._nodeEnd=this._root.data[1]={
+		id: this._nextId++,
+		data: this._objEnd,
+		weight: 0,
+		parent: this._root
+	};
+	this._blocks[0].insert(this._root);
+	this._blocks[0].insert(this._nodeNYT);
+	this._blocks[0].insert(this._nodeEnd);
+	//Use Base64 alphabet. For some extra compression, use a 128-length alphabet, or if you can send the full range of characters, set it to a 256-length alphabet
 	var alphabet="ABCDEFGHIJKLMNOPQRTSUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+	/* Example 256-len alphabet
+	var alphabet=[]
+	for (var i=0; i<256; i++)
+		alphabet[i]=i;
+	alphabet=String.fromCharCode.apply(String,alphabet);
+	*/
 	//Generate _compressRoot
 	var bits=Math.floor(Math.log(alphabet.length)/Math.log(2));
 	this._compressRoot=[];
@@ -129,10 +120,10 @@ function HuffmanTree() {
 			else current=next;
 		}
 		set=((i & (1<<bit))!=0)?1:0;
-		current[set]=alphabet.charAt(i);
+		current[set]=alphabet.charCodeAt(i);
 	}
 	
-	this._compressed="";
+	this._compressed=[];
 	this._compressCurrent=this._compressRoot;
 	
 	//Generate uncompressTable
@@ -163,21 +154,17 @@ HuffmanTree.uncompressStages={
 HuffmanTree.prototype._outputCompressedBit=function(bit) {
 	this._compressCurrent=this._compressCurrent[bit];
 	if (typeof(this._compressCurrent)!=="object") {
-		this._compressed+=this._compressCurrent;
+		this._compressed.push(this._compressCurrent);
 		this._compressCurrent=this._compressRoot;
 	}
 	
 }
 HuffmanTree.prototype._flushCompressed=function() {
 	while (this._compressCurrent!==this._compressRoot) {
-		this._compressCurrent=this._compressCurrent[0];
-		if (typeof(this._compressCurrent)!=="object") {
-			this._compressed+=this._compressCurrent;
-			this._compressCurrent=this._compressRoot;
-		}
+		this._outputCompressedBit(0);
 	}
-	var s=this._compressed;
-	this._compressed="";
+	var s=String.fromCharCode.apply(String,this._compressed);//.join("");
+	this._compressed=[];
 	this.onCompressed(s);
 }
 HuffmanTree.prototype.onCompressed=function() {};
@@ -255,7 +242,6 @@ HuffmanTree.prototype._splitNYT=function(node,chr) {
 }
 
 HuffmanTree.prototype.swapNodes=function(a,b) {
-	//this.printTree();
 	var adata=a.data;
 	var aweight=a.weight;
 	var aparent=a.parent;
@@ -444,27 +430,19 @@ function go() {
 	send=send+send;
 	send=send+send;
 	send=send+send;
-	//send=send.substr(0,50);
-	//send=send+send;
-	//var send="abcd\n";
-	send="abcdefghijklmnopqrstuvwxyz";
-	for (var doubleup=0; doubleup<0; doubleup++);
-		send+=send;
 	
 	var sent="";
-	var lines=[];
 	hf.onCompressed=function(data) {
 		sent+=data;
 	}
 
 	//hf.printTree();
 	var start=new Date();
-	for (var trip=0; trip<10000; trip++) {
-		for (var i=0; i<26; i++) {
-			/*var c=send.charAt(i);
+	for (var trip=0; trip<3; trip++) {
+		for (var i=0; i<send.length; i++) {
+			var c=send.charAt(i);
 			if (c==="\n") hf.compressFlush();
-			else hf.compressCharacter(c);*/
-			hf.compressCharacter(String.fromCharCode(97+i));
+			else hf.compressCharacter(c);
 		}
 	}
 	hf.compressFlush();
@@ -473,26 +451,34 @@ function go() {
 	var sentCompressed=sent.length;
 	var sentUncompressed=i*trip;
 	sys.puts("Sent: "+Math.ceil((sentCompressed*100)/sentUncompressed)+"% ("+sentCompressed+"/"+sentUncompressed+") "+duration);
-	sys.puts("comp kbps: "+((sentUncompressed/1024)/(duration/1000)));
-	/*var n=0;
-	sys.puts("Output: "+lines[n]+" "+send.split("\n")[n]);*/
-	
+	sys.puts("Compression kbps: "+((sentUncompressed/1024)/(duration/1000)));
+
 	start=new Date();
 	var hf2=new HuffmanTree();
 	var got=0;
 	hf2.onUncompressed=function(data) {
-		if (got++<5) {
-			sys.puts("Line: "+data.substr(0,10));
+		if (got++ < 5) {
+			sys.puts("Line: "+data.substr(0,500));
 		}
 	}
 	for (i=0; i<sent.length; i++) {
 		hf2.uncompressCharacter(sent[i]);
 	}
 	end=new Date();
+	duration=end - start;
+	sys.puts("Decompression kbps (input): "+((sent.length/1024)/(duration/1000)));
+	sys.puts("Decompression kbps (output): "+(((send.length*3)/1024)/(duration/1000)));
+	
+	start=new Date();
+	var strout="";
+	for ( trip=0; trip<3; trip++) {
+		for ( i=0; i<send.length; i++) {
+			strout+=send.charAt(i);
+		}
+	}
+	end=new Date();
 	duration=end-start;
-	sys.puts("decomp kbps (input): "+((sent.length/1024)/(duration/1000)));
-	sys.puts("decomp kbps (output): "+(((send.length*3)/1024)/(duration/1000)));
-	//sys.puts("Uncomp: "+JSON.stringify(hf2._uncompressed.substr(0,100)));
+	sys.puts("Copy kbps: "+((strout.length/1024)/(duration/1000)));
 	return false;
 }
 
